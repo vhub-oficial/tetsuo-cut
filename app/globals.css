@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon: #00ff94;
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface-raised: #1a1a1a;
+  --border: #2a2a2a;
+  --text: #ffffff;
+  --text-muted: #a0a0a0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Neon glow utilities */
+@layer utilities {
+  .glow-neon {
+    box-shadow: 0 0 20px rgba(0, 255, 148, 0.3);
+  }
+
+  .glow-neon-sm {
+    box-shadow: 0 0 8px rgba(0, 255, 148, 0.25);
+  }
+
+  .text-glow-neon {
+    text-shadow: 0 0 20px rgba(0, 255, 148, 0.5);
+  }
+
+  .border-neon {
+    border-color: var(--neon);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 2px;
+}
