@@ -1,0 +1,39 @@
+name: Deploy Modal Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modal-worker/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Modal
+        run: pip install modal
+
+      - name: Configure Modal credentials
+        run: |
+          modal config set token-id ${{ secrets.MODAL_TOKEN_ID }}
+          modal config set token-secret ${{ secrets.MODAL_TOKEN_SECRET }}
+
+      - name: Create Supabase secrets on Modal
+        run: |
+          modal secret create tetsuo-cut-secrets \
+            SUPABASE_URL=https://nztdmhomzckaqlilqjrb.supabase.co \
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} \
+            --force
+        working-directory: modal-worker
+
+      - name: Deploy worker
+        run: modal deploy worker.py
+        working-directory: modal-worker
