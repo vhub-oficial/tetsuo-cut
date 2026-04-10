@@ -24,7 +24,7 @@ app = modal.App("tetsuo-cut")
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
-    .pip_install("supabase==2.10.0", "httpx==0.27.0")
+    .pip_install("fastapi[standard]", "supabase==2.10.0", "httpx==0.27.0")
 )
 
 # ffmpeg filter chains — exact parameters as specified
@@ -48,7 +48,7 @@ MP3_FILTERS = (
 
 
 @app.function(
-    image=image,
+    =image,
     secrets=[modal.Secret.from_name("tetsuo-cut-secrets")],
     timeout=600,
     memory=1024,
