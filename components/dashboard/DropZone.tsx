@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Job } from '@/lib/types'
+import ProjectSelector from './ProjectSelector'
 
 const ACCEPTED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/wave', 'audio/x-wav']
 const ACCEPTED_EXT = ['.mp3', '.wav']
@@ -31,6 +32,7 @@ export default function DropZone({
 }) {
   const [dragging, setDragging] = useState(false)
   const [uploads, setUploads] = useState<UploadItem[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const processFiles = useCallback(
@@ -84,6 +86,7 @@ export default function DropZone({
               file_size_bytes: file.size,
               status: 'pending',
               settings: {},
+              project_id: selectedProjectId,
             })
             .select()
             .single()
@@ -123,7 +126,7 @@ export default function DropZone({
         }
       }
     },
-    [userId, onJobCreated]
+    [userId, onJobCreated, selectedProjectId]
   )
 
   const onDrop = useCallback(
@@ -151,6 +154,7 @@ export default function DropZone({
 
   return (
     <div className="space-y-3">
+      <ProjectSelector value={selectedProjectId} onChange={setSelectedProjectId} />
       <div
         onDrop={onDrop}
         onDragOver={onDragOver}

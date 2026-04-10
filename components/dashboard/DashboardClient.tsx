@@ -4,13 +4,16 @@ import { useCallback, useRef } from 'react'
 import type { Job } from '@/lib/types'
 import DropZone from './DropZone'
 import JobList from './JobList'
+import StorageBar from './StorageBar'
 
 interface DashboardClientProps {
   userId: string
   initialJobs: Job[]
+  storageUsed: number
+  storageLimit: number
 }
 
-export default function DashboardClient({ userId, initialJobs }: DashboardClientProps) {
+export default function DashboardClient({ userId, initialJobs, storageUsed, storageLimit }: DashboardClientProps) {
   const addJobRef = useRef<((job: Job) => void) | null>(null)
 
   const onRegisterAdd = useCallback((fn: (job: Job) => void) => {
@@ -31,6 +34,8 @@ export default function DashboardClient({ userId, initialJobs }: DashboardClient
         </div>
         <DropZone userId={userId} onJobCreated={onJobCreated} />
       </section>
+
+      <StorageBar used={storageUsed} limit={storageLimit} />
 
       {/* History section — JobList renders its own header */}
       <JobList initialJobs={initialJobs} onRegisterAdd={onRegisterAdd} />
