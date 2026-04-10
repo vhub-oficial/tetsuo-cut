@@ -10,6 +10,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
     steps:
       - uses: actions/checkout@v4
 
@@ -20,11 +23,6 @@ jobs:
 
       - name: Install Modal
         run: pip install modal
-
-      - name: Configure Modal credentials
-        run: |
-          modal config set token-id ${{ secrets.MODAL_TOKEN_ID }}
-          modal config set token-secret ${{ secrets.MODAL_TOKEN_SECRET }}
 
       - name: Create Supabase secrets on Modal
         run: |
