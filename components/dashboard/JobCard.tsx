@@ -177,7 +177,7 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
         <div className="flex items-start gap-2">
           <button
             onClick={handleDelete}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-[#555] hover:text-red-400 mt-0.5"
+            className="opacity-0 group-hover:opacity-100 transition-all text-[#555] hover:text-red-400 hover:drop-shadow-[0_0_6px_rgba(248,113,113,0.8)] mt-0.5"
             title="Delete job"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,11 +186,11 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
             </svg>
           </button>
           <div>
-            <p className="text-[#555] text-xs">
+            <p className="text-[#666] text-xs">
               {new Date(job.created_at).toLocaleString()}
             </p>
             {job.status === 'done' && job.processing_started_at && job.processing_finished_at && (
-              <p className="text-[#555] text-xs mt-0.5">
+              <p className="text-[#666] text-xs mt-0.5">
                 {formatProcessingTime(job.processing_started_at, job.processing_finished_at)}
               </p>
             )}

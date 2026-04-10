@@ -34,19 +34,24 @@ export default async function ProjectPage({ params }: { params: { projectId: str
     .limit(50)
 
   const jobList = (jobs as Job[]) ?? []
+  const doneCount = jobList.filter(j => j.status === 'done').length
 
   return (
     <main className="max-w-5xl mx-auto px-8 py-8 space-y-8">
-      <div className="flex items-center gap-3">
-        <span
-          className="w-3 h-3 rounded-full flex-shrink-0"
-          style={{ backgroundColor: typedProject.color }}
-        />
-        <div>
-          <h2 className="text-white text-xl font-semibold">{typedProject.name}</h2>
-          <p className="text-[#555] text-sm mt-0.5">
-            {jobList.length} file{jobList.length !== 1 ? 's' : ''}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: `${typedProject.color}20`, boxShadow: `0 0 20px ${typedProject.color}30` }}
+          >
+            <span className="w-4 h-4 rounded-full" style={{ backgroundColor: typedProject.color }} />
+          </div>
+          <div>
+            <h2 className="text-white text-xl font-bold">{typedProject.name}</h2>
+            <p className="text-[#666] text-sm mt-0.5">
+              {doneCount} processed · {jobList.length} total
+            </p>
+          </div>
         </div>
       </div>
 

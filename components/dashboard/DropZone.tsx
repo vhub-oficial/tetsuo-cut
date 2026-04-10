@@ -93,12 +93,31 @@ export default function DropZone({
 
           if (insertError || !job) throw new Error(insertError?.message ?? 'Failed to create job')
 
-          // Trigger processing — await so the loop stays sequential
-          await fetch('/api/process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ job_id: job.id }),
-          }).catch(() => {})
+          // Trigger processing with automatic retry (max 2 attempts, silent)
+          const processBody = JSON.stringify({ job_id: job.id })
+          let processOk = false
+          try {
+            const processRes = await fetch('/api/process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: processBody,
+            })
+            processOk = processRes.ok
+          } catch {
+            processOk = false
+          }
+          if (!processOk) {
+            await new Promise(r => setTimeout(r, 2000))
+            try {
+              await fetch('/api/process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: processBody,
+              })
+            } catch {
+              // silently ignore — cron fallback will handle it
+            }
+          }
 
           // Jump to 100% and notify parent
           clearInterval(progressInterval)
