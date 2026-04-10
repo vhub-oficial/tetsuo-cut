@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Job, JobStatus } from '@/lib/types'
-import ProjectSelector from './ProjectSelector'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -69,7 +68,6 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
   const [downloading, setDownloading] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
-  const [projectId, setProjectId] = useState<string | null>(initialJob.project_id ?? null)
 
   useEffect(() => {
     if (job.status === 'done' || job.status === 'error') return
@@ -92,15 +90,6 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
     if (!window.confirm('Delete this job and its files?')) return
     await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' })
     onDelete(job.id)
-  }
-
-  async function handleProjectChange(id: string | null) {
-    setProjectId(id)
-    await fetch(`/api/jobs/${job.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: id }),
-    })
   }
 
   async function handleRetry() {
@@ -209,29 +198,26 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
         </div>
 
         {job.status === 'done' && (
-          <div className="flex flex-col items-end gap-2">
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="flex items-center gap-2 bg-[#00FF94] text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#00e085] transition-colors disabled:opacity-50 disabled:cursor-not-allowed glow-neon-sm"
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex items-center gap-2 bg-[#00FF94] text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#00e085] transition-colors disabled:opacity-50 disabled:cursor-not-allowed glow-neon-sm"
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              {downloading ? 'Preparing…' : 'Download'}
-            </button>
-            <ProjectSelector compact value={projectId} onChange={handleProjectChange} />
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+            {downloading ? 'Preparing…' : 'Download'}
+          </button>
         )}
 
         {job.status === 'error' && (
@@ -259,7 +245,6 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
             {retryError && (
               <p className="text-red-400 text-xs">{retryError}</p>
             )}
-            <ProjectSelector compact value={projectId} onChange={handleProjectChange} />
           </div>
         )}
       </div>

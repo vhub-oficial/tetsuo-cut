@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Job, Project } from '@/lib/types'
+import type { Job } from '@/lib/types'
 import JobCard from './JobCard'
 
 interface JobListProps {
@@ -11,8 +11,6 @@ interface JobListProps {
 
 export default function JobList({ initialJobs, onRegisterAdd }: JobListProps) {
   const [jobs, setJobs] = useState<Job[]>(initialJobs)
-  const [filterProject, setFilterProject] = useState<string | 'all'>('all')
-  const [projects, setProjects] = useState<Project[]>([])
 
   useEffect(() => {
     onRegisterAdd?.((job: Job) => {
@@ -20,23 +18,11 @@ export default function JobList({ initialJobs, onRegisterAdd }: JobListProps) {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    fetch('/api/projects')
-      .then(r => r.json())
-      .then(d => setProjects(d.projects ?? []))
-  }, [])
-
   function handleDelete(id: string) {
     setJobs(prev => prev.filter(j => j.id !== id))
   }
 
-  const filteredJobs = filterProject === 'all'
-    ? jobs
-    : jobs.filter(j => j.project_id === filterProject)
-
-  const doneJobs = filteredJobs.filter((j) => j.status === 'done')
-  const hasProjectedJobs = jobs.some(j => j.project_id !== null)
-  const visibleProjects = projects.filter(p => jobs.some(j => j.project_id === p.id))
+  const doneJobs = jobs.filter((j) => j.status === 'done')
 
   async function handleDownloadAll() {
     for (const job of doneJobs) {
@@ -76,37 +62,6 @@ export default function JobList({ initialJobs, onRegisterAdd }: JobListProps) {
         )}
       </div>
 
-      {/* Project filter chips */}
-      {hasProjectedJobs && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => setFilterProject('all')}
-            className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-              filterProject === 'all'
-                ? 'border-[#00FF94] text-[#00FF94] bg-[#00FF94]/10'
-                : 'border-[#2A2A2A] text-[#555] hover:border-[#3A3A3A]'
-            }`}
-          >
-            All
-          </button>
-          {visibleProjects.map(p => (
-            <button
-              key={p.id}
-              onClick={() => setFilterProject(p.id)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
-                filterProject === p.id
-                  ? 'border-current bg-current/10'
-                  : 'border-[#2A2A2A] text-[#A0A0A0] hover:border-[#3A3A3A]'
-              }`}
-              style={filterProject === p.id ? { color: p.color, borderColor: p.color } : {}}
-            >
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
-              {p.name}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Empty state */}
       {jobs.length === 0 ? (
         <div className="text-center py-16">
@@ -132,7 +87,7 @@ export default function JobList({ initialJobs, onRegisterAdd }: JobListProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredJobs.map((job) => (
+          {jobs.map((job) => (
             <JobCard key={job.id} initialJob={job} onDelete={handleDelete} />
           ))}
         </div>
