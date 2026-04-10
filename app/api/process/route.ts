@@ -1,6 +1,8 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 
+const STALE_THRESHOLD_MS = 60 * 1000
+
 export async function POST(req: Request) {
   // Verify the caller is authenticated
   const authClient = await createClient()
@@ -29,7 +31,7 @@ export async function POST(req: Request) {
 
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('id, user_id, status')
+    .select('id, user_id, status, created_at, processing_started_at')
     .eq('id', job_id)
     .single()
 
@@ -41,10 +43,34 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  if (job.status !== 'pending') {
-    return Response.json({ error: 'Job is not in pending state' }, { status: 409 })
+  const now = Date.now()
+
+  if (job.status === 'done' || job.status === 'error') {
+    return Response.json({ error: 'Job is not in a retryable state' }, { status: 409 })
   }
 
+  if (job.status === 'processing') {
+    const startedAt = job.processing_started_at
+      ? new Date(job.processing_started_at).getTime()
+      : null
+
+    if (!startedAt || now - startedAt <= STALE_THRESHOLD_MS) {
+      return Response.json({ error: 'Job is already processing' }, { status: 409 })
+    }
+
+    // Stale processing job — reset to pending before retrying
+    const { error: resetError } = await supabase
+      .from('jobs')
+      .update({ status: 'pending', processing_started_at: null })
+      .eq('id', job_id)
+
+    if (resetError) {
+      console.error('[process] Failed to reset stale processing job:', resetError)
+      return Response.json({ error: 'Failed to reset job' }, { status: 500 })
+    }
+  }
+
+  // status is 'pending' at this point (original or just reset from stale processing)
   const modalUrl = process.env.MODAL_ENDPOINT_URL
   if (!modalUrl) {
     return Response.json({ error: 'Modal endpoint not configured' }, { status: 503 })
