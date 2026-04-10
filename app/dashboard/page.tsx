@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Job } from '@/lib/types'
-import DropZone from '@/components/dashboard/DropZone'
-import JobList from '@/components/dashboard/JobList'
+import DashboardClient from '@/components/dashboard/DashboardClient'
 
 async function logout() {
   'use server'
@@ -10,6 +9,13 @@ async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
   redirect('/login')
+}
+
+function formatStorage(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export default async function DashboardPage() {
@@ -36,6 +42,14 @@ export default async function DashboardPage() {
     .single()
 
   const displayName = profile?.full_name ?? user.email
+  const jobList = (jobs as Job[]) ?? []
+
+  // Stats
+  const doneCount = jobList.filter((j) => j.status === 'done').length
+  const queueCount = jobList.filter(
+    (j) => j.status === 'pending' || j.status === 'processing'
+  ).length
+  const storageBytes = jobList.reduce((sum, j) => sum + j.file_size_bytes, 0)
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -69,30 +83,24 @@ export default async function DashboardPage() {
 
       {/* Main content */}
       <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">
-        {/* Drop zone section */}
-        <section>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-1 h-5 bg-[#00FF94] rounded-full" />
-            <h2 className="text-white font-semibold text-lg">New Job</h2>
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-[#111] border border-[#2A2A2A] rounded-xl p-4">
+            <p className="text-[#00FF94] text-2xl font-bold">{doneCount}</p>
+            <p className="text-[#555] text-xs mt-1 uppercase tracking-wider">Files processed</p>
           </div>
-          <DropZone userId={user.id} />
-        </section>
+          <div className="bg-[#111] border border-[#2A2A2A] rounded-xl p-4">
+            <p className="text-white text-2xl font-bold">{queueCount}</p>
+            <p className="text-[#555] text-xs mt-1 uppercase tracking-wider">Still in queue</p>
+          </div>
+          <div className="bg-[#111] border border-[#2A2A2A] rounded-xl p-4">
+            <p className="text-white text-2xl font-bold">{formatStorage(storageBytes)}</p>
+            <p className="text-[#555] text-xs mt-1 uppercase tracking-wider">Storage used</p>
+          </div>
+        </div>
 
-        {/* Jobs history section */}
-        <section>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-1 h-5 bg-[#00FF94]/40 rounded-full" />
-            <h2 className="text-white font-semibold text-lg">
-              History
-              {jobs && jobs.length > 0 && (
-                <span className="ml-2 text-sm font-normal text-[#555]">
-                  {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </h2>
-          </div>
-          <JobList initialJobs={(jobs as Job[]) ?? []} />
-        </section>
+        {/* DropZone + JobList via client wrapper */}
+        <DashboardClient userId={user.id} initialJobs={jobList} />
       </main>
     </div>
   )

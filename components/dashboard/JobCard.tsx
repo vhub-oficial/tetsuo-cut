@@ -17,6 +17,11 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function formatProcessingTime(start: string, end: string): string {
+  const s = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000)
+  return `Processed in ${s}s`
+}
+
 function StatusBadge({ status }: { status: JobStatus }) {
   const styles: Record<JobStatus, string> = {
     pending: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
@@ -116,7 +121,7 @@ export default function JobCard({ initialJob }: JobCardProps) {
 
   return (
     <div
-      className={`bg-[#1A1A1A] border rounded-xl p-5 transition-all ${
+      className={`bg-[#1A1A1A] border rounded-xl p-5 transition-all duration-200 hover:border-[#333333] hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] ${
         isActive
           ? 'border-amber-400/30 shadow-[0_0_16px_rgba(251,191,36,0.1)]'
           : job.status === 'done'
@@ -144,25 +149,34 @@ export default function JobCard({ initialJob }: JobCardProps) {
         <StatusBadge status={job.status} />
       </div>
 
-      {/* Processing bar */}
+      {/* Processing sweep bar */}
       {job.status === 'processing' && (
         <div className="mb-4 h-1 bg-[#2A2A2A] rounded-full overflow-hidden">
-          <div className="h-full bg-amber-400 rounded-full animate-pulse w-2/3" />
+          <div className="h-full w-full relative">
+            <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-shimmer" />
+          </div>
         </div>
       )}
 
       {/* Error message */}
-      {job.status === 'error' && job.error_message && (
+      {job.status === 'error' && (
         <p className="text-red-400 text-xs bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mb-4">
-          {job.error_message}
+          {job.error_message || 'Processing failed. Try again.'}
         </p>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between">
-        <p className="text-[#555] text-xs">
-          {new Date(job.created_at).toLocaleString()}
-        </p>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-[#555] text-xs">
+            {new Date(job.created_at).toLocaleString()}
+          </p>
+          {job.status === 'done' && job.processing_started_at && job.processing_finished_at && (
+            <p className="text-[#555] text-xs mt-0.5">
+              {formatProcessingTime(job.processing_started_at, job.processing_finished_at)}
+            </p>
+          )}
+        </div>
 
         {job.status === 'done' && (
           <button

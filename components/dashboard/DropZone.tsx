@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Job } from '@/lib/types'
-import { addJobToList } from './JobList'
 
 const ACCEPTED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/wave', 'audio/x-wav']
 const ACCEPTED_EXT = ['.mp3', '.wav']
@@ -12,7 +11,8 @@ const MAX_SIZE_BYTES = 100 * 1024 * 1024 // 100 MB
 interface UploadItem {
   file: File
   id: string
-  progress: 'uploading' | 'queued' | 'error'
+  status: 'uploading' | 'queued' | 'error'
+  progress: number // 0–100
   error?: string
 }
 
@@ -22,7 +22,13 @@ function isAudioFile(file: File): boolean {
   return typeOk || extOk
 }
 
-export default function DropZone({ userId }: { userId: string }) {
+export default function DropZone({
+  userId,
+  onJobCreated,
+}: {
+  userId: string
+  onJobCreated: (job: Job) => void
+}) {
   const [dragging, setDragging] = useState(false)
   const [uploads, setUploads] = useState<UploadItem[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -42,9 +48,20 @@ export default function DropZone({ userId }: { userId: string }) {
       for (const file of valid) {
         const itemId = crypto.randomUUID()
         setUploads((prev) => [
-          { file, id: itemId, progress: 'uploading' },
+          { file, id: itemId, status: 'uploading', progress: 0 },
           ...prev,
         ])
+
+        // Fake progress: increments ~1.5 per 100ms, caps at 80
+        const progressInterval = setInterval(() => {
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.id === itemId && u.status === 'uploading'
+                ? { ...u, progress: Math.min(u.progress + 1.5, 80) }
+                : u
+            )
+          )
+        }, 100)
 
         try {
           const ext = file.name.split('.').pop()!.toLowerCase()
@@ -80,16 +97,23 @@ export default function DropZone({ userId }: { userId: string }) {
             body: JSON.stringify({ job_id: job.id }),
           }).catch(() => {})
 
-          // Add to job list
-          addJobToList(job as Job)
+          // Jump to 100% and notify parent
+          clearInterval(progressInterval)
+          setUploads((prev) =>
+            prev.map((u) => (u.id === itemId ? { ...u, progress: 100 } : u))
+          )
+          onJobCreated(job as Job)
 
-          // Mark upload complete
-          setUploads((prev) => prev.filter((u) => u.id !== itemId))
+          // Remove upload card after a brief moment
+          setTimeout(() => {
+            setUploads((prev) => prev.filter((u) => u.id !== itemId))
+          }, 400)
         } catch (err) {
+          clearInterval(progressInterval)
           const message = err instanceof Error ? err.message : 'Upload failed'
           setUploads((prev) =>
             prev.map((u) =>
-              u.id === itemId ? { ...u, progress: 'error', error: message } : u
+              u.id === itemId ? { ...u, status: 'error', progress: 0, error: message } : u
             )
           )
           // Auto-clear error after 5s
@@ -99,7 +123,7 @@ export default function DropZone({ userId }: { userId: string }) {
         }
       }
     },
-    [userId]
+    [userId, onJobCreated]
   )
 
   const onDrop = useCallback(
@@ -195,28 +219,37 @@ export default function DropZone({ userId }: { userId: string }) {
           {uploads.map((u) => (
             <div
               key={u.id}
-              className={`flex items-center gap-3 bg-[#1A1A1A] border rounded-lg px-4 py-3 text-sm ${
-                u.progress === 'error'
+              className={`relative flex items-center gap-3 bg-[#1A1A1A] border rounded-lg px-4 py-3 text-sm overflow-hidden ${
+                u.status === 'error'
                   ? 'border-red-500/30'
                   : 'border-[#2A2A2A]'
               }`}
             >
-              {u.progress === 'uploading' && (
+              {u.status === 'uploading' && (
                 <div className="w-4 h-4 border-2 border-[#00FF94]/30 border-t-[#00FF94] rounded-full animate-spin flex-shrink-0" />
               )}
-              {u.progress === 'error' && (
+              {u.status === 'error' && (
                 <span className="text-red-400 flex-shrink-0">✕</span>
               )}
               <span className="truncate text-[#A0A0A0]">{u.file.name}</span>
-              {u.progress === 'uploading' && (
-                <span className="ml-auto text-xs text-[#555] flex-shrink-0">
-                  Uploading…
+              {u.status === 'uploading' && (
+                <span className="ml-auto text-xs text-[#555] flex-shrink-0 tabular-nums">
+                  {Math.round(u.progress)}%
                 </span>
               )}
-              {u.progress === 'error' && u.error && (
+              {u.status === 'error' && u.error && (
                 <span className="ml-auto text-xs text-red-400 flex-shrink-0">
                   {u.error}
                 </span>
+              )}
+              {/* Progress bar */}
+              {u.status === 'uploading' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#2A2A2A] overflow-hidden">
+                  <div
+                    className="h-full bg-[#00FF94] transition-all duration-300"
+                    style={{ width: `${u.progress}%` }}
+                  />
+                </div>
               )}
             </div>
           ))}
