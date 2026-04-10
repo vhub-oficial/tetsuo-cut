@@ -77,7 +77,7 @@ export default function DropZone({
 
       // All files upload in parallel — no more sequential blocking
       await Promise.all(
-        valid.map(async (file) => {
+        valid.map(async (file, fileIndex) => {
           const itemId = crypto.randomUUID()
           setUploads((prev) => [
             { file, id: itemId, status: 'uploading', progress: 0 },
@@ -133,8 +133,8 @@ export default function DropZone({
               setUploads((prev) => prev.filter((u) => u.id !== itemId))
             }, 400)
 
-            // Trigger processing in the background — does NOT block the UX
-            void fireProcess(job.id)
+            // Trigger processing in the background — staggered to avoid thundering herd
+            setTimeout(() => void fireProcess(job.id), fileIndex * 350)
           } catch (err) {
             clearInterval(progressInterval)
             const message = err instanceof Error ? err.message : 'Upload failed'

@@ -1,6 +1,8 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 
+export const maxDuration = 30
+
 const STALE_THRESHOLD_MS = 60 * 1000
 
 export async function POST(req: Request) {
@@ -76,14 +78,25 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Modal endpoint not configured' }, { status: 503 })
   }
 
-  // Fire and forget — do not await
-  fetch(modalUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ job_id }),
-  }).catch((err) => {
-    console.error('[process] Modal call failed:', err)
-  })
+  const controller = new AbortController()
+  const tid = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const modalRes = await fetch(modalUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id }),
+      signal: controller.signal,
+    })
+    clearTimeout(tid)
+    if (!modalRes.ok) {
+      console.error('[process] Modal returned', modalRes.status)
+      return Response.json({ error: 'Trigger failed' }, { status: 502 })
+    }
+  } catch (err) {
+    clearTimeout(tid)
+    console.error('[process] Modal unreachable:', err)
+    return Response.json({ error: 'Modal unreachable' }, { status: 502 })
+  }
 
   return Response.json({ ok: true })
 }

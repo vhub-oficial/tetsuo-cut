@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Job, JobStatus } from '@/lib/types'
 
-const STUCK_AFTER_SECS = 90
+const STUCK_AFTER_SECS = 60
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
