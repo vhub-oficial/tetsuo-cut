@@ -1,17 +1,5 @@
 """
 TETSUO CUT — Modal.com Audio Processing Worker
-
-Deploy: modal deploy modal-worker/worker.py
-Secrets: Create a Modal secret named "tetsuo-cut-secrets" with:
-  - SUPABASE_URL
-  - SUPABASE_SERVICE_ROLE_KEY
-
-The worker exposes a web endpoint that:
-1. Receives a job_id
-2. Downloads the original audio from Supabase Storage
-3. Runs ffmpeg silence removal filters
-4. Uploads the processed file to Supabase Storage
-5. Updates the job status in the database
 """
 
 import modal
@@ -27,7 +15,6 @@ image = (
     .pip_install("fastapi[standard]", "supabase==2.10.0", "httpx==0.27.0")
 )
 
-# ffmpeg filter chains — exact parameters as specified
 WAV_FILTERS = (
     "highpass=f=80,"
     "acompressor=threshold=-20dB:ratio=4:makeup=6dB,"
@@ -48,31 +35,28 @@ MP3_FILTERS = (
 
 
 @app.function(
-    =image,
+    image=image,
     secrets=[modal.Secret.from_name("tetsuo-cut-secrets")],
     timeout=600,
     memory=1024,
 )
 @modal.fastapi_endpoint(method="POST")
 def process_audio(item: dict) -> dict:
-    """Web endpoint: receives {job_id} and processes the audio file."""
     from supabase import create_client
 
     job_id = item.get("job_id")
     if not job_id:
-        return {"error": "missing job_id"}, 400
+        return {"error": "missing job_id"}
 
     supabase_url = os.environ["SUPABASE_URL"]
     service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     client = create_client(supabase_url, service_key)
 
-    # Mark as processing
     client.table("jobs").update(
         {"status": "processing", "processing_started_at": "now()"}
     ).eq("id", job_id).execute()
 
     try:
-        # Fetch job details
         result = (
             client.table("jobs")
             .select("*")
@@ -91,7 +75,6 @@ def process_audio(item: dict) -> dict:
         if ext not in ("mp3", "wav"):
             raise ValueError(f"Unsupported file format: {ext}")
 
-        # Download original file from Supabase Storage
         file_bytes = client.storage.from_("audio-originals").download(original_path)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -101,17 +84,15 @@ def process_audio(item: dict) -> dict:
             with open(input_path, "wb") as f:
                 f.write(file_bytes)
 
-            # Select filter chain and codec based on format
             if ext == "wav":
                 filters = WAV_FILTERS
                 codec_args = ["-acodec", "pcm_s16le"]
-            else:  # mp3
+            else:
                 filters = MP3_FILTERS
                 codec_args = ["-acodec", "libmp3lame", "-b:a", "192k"]
 
             cmd = [
-                "ffmpeg",
-                "-y",                   # Overwrite output without asking
+                "ffmpeg", "-y",
                 "-i", input_path,
                 "-af", filters,
                 *codec_args,
@@ -121,15 +102,12 @@ def process_audio(item: dict) -> dict:
             proc = subprocess.run(cmd, capture_output=True, text=True)
 
             if proc.returncode != 0:
-                # Truncate stderr to avoid very long error messages
                 stderr_tail = proc.stderr[-1000:] if proc.stderr else "(no output)"
                 raise RuntimeError(f"ffmpeg failed (exit {proc.returncode}): {stderr_tail}")
 
-            # Read processed file
             with open(output_path, "rb") as f:
                 processed_bytes = f.read()
 
-        # Upload processed file to audio-processed bucket
         processed_path = f"{job['user_id']}/processed/{job_id}.{ext}"
         client.storage.from_("audio-processed").upload(
             processed_path,
@@ -137,7 +115,6 @@ def process_audio(item: dict) -> dict:
             {"content-type": f"audio/{ext}"},
         )
 
-        # Mark job as done
         client.table("jobs").update(
             {
                 "status": "done",
@@ -149,7 +126,7 @@ def process_audio(item: dict) -> dict:
         return {"ok": True, "job_id": job_id}
 
     except Exception as exc:
-        error_message = str(exc)[:2000]  # Truncate to fit DB column
+        error_message = str(exc)[:2000]
 
         client.table("jobs").update(
             {
@@ -159,7 +136,6 @@ def process_audio(item: dict) -> dict:
             }
         ).eq("id", job_id).execute()
 
-        # Log to job_logs
         try:
             client.table("job_logs").insert(
                 {
