@@ -73,8 +73,8 @@ export default function DropZone({ userId }: { userId: string }) {
 
           if (insertError || !job) throw new Error(insertError?.message ?? 'Failed to create job')
 
-          // Trigger processing (fire and forget from UI perspective)
-          fetch('/api/process', {
+          // Trigger processing — await so the loop stays sequential
+          await fetch('/api/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ job_id: job.id }),
