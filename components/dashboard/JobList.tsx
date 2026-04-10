@@ -18,6 +18,10 @@ export default function JobList({ initialJobs, onRegisterAdd }: JobListProps) {
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function handleDelete(id: string) {
+    setJobs(prev => prev.filter(j => j.id !== id))
+  }
+
   const doneJobs = jobs.filter((j) => j.status === 'done')
 
   async function handleDownloadAll() {
@@ -84,7 +88,7 @@ export default function JobList({ initialJobs, onRegisterAdd }: JobListProps) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {jobs.map((job) => (
-            <JobCard key={job.id} initialJob={job} />
+            <JobCard key={job.id} initialJob={job} onDelete={handleDelete} />
           ))}
         </div>
       )}

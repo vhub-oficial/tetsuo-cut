@@ -16,6 +16,7 @@ export interface Job {
   processing_finished_at: string | null
   created_at: string
   updated_at: string
+  project_id: string | null
 }
 
 export interface Profile {
@@ -23,6 +24,17 @@ export interface Profile {
   full_name: string | null
   avatar_url: string | null
   role: string
+  created_at: string
+  updated_at: string
+  storage_used_bytes: number
+  storage_limit_bytes: number
+}
+
+export interface Project {
+  id: string
+  user_id: string
+  name: string
+  color: string
   created_at: string
   updated_at: string
 }

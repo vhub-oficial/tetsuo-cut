@@ -60,9 +60,10 @@ function StatusBadge({ status }: { status: JobStatus }) {
 
 interface JobCardProps {
   initialJob: Job
+  onDelete: (id: string) => void
 }
 
-export default function JobCard({ initialJob }: JobCardProps) {
+export default function JobCard({ initialJob, onDelete }: JobCardProps) {
   const [job, setJob] = useState<Job>(initialJob)
   const [downloading, setDownloading] = useState(false)
   const [retrying, setRetrying] = useState(false)
@@ -84,6 +85,12 @@ export default function JobCard({ initialJob }: JobCardProps) {
 
     return () => clearInterval(interval)
   }, [job.status, job.id])
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this job and its files?')) return
+    await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' })
+    onDelete(job.id)
+  }
 
   async function handleRetry() {
     setRetrying(true)
@@ -121,7 +128,7 @@ export default function JobCard({ initialJob }: JobCardProps) {
 
   return (
     <div
-      className={`bg-[#1A1A1A] border rounded-xl p-5 transition-all duration-200 hover:border-[#333333] hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] ${
+      className={`group bg-[#1A1A1A] border rounded-xl p-5 transition-all duration-200 hover:border-[#333333] hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] ${
         isActive
           ? 'border-amber-400/30 shadow-[0_0_16px_rgba(251,191,36,0.1)]'
           : job.status === 'done'
@@ -167,15 +174,27 @@ export default function JobCard({ initialJob }: JobCardProps) {
 
       {/* Footer */}
       <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[#555] text-xs">
-            {new Date(job.created_at).toLocaleString()}
-          </p>
-          {job.status === 'done' && job.processing_started_at && job.processing_finished_at && (
-            <p className="text-[#555] text-xs mt-0.5">
-              {formatProcessingTime(job.processing_started_at, job.processing_finished_at)}
+        <div className="flex items-start gap-2">
+          <button
+            onClick={handleDelete}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-[#555] hover:text-red-400 mt-0.5"
+            title="Delete job"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+          <div>
+            <p className="text-[#555] text-xs">
+              {new Date(job.created_at).toLocaleString()}
             </p>
-          )}
+            {job.status === 'done' && job.processing_started_at && job.processing_finished_at && (
+              <p className="text-[#555] text-xs mt-0.5">
+                {formatProcessingTime(job.processing_started_at, job.processing_finished_at)}
+              </p>
+            )}
+          </div>
         </div>
 
         {job.status === 'done' && (

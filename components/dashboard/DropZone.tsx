@@ -24,9 +24,11 @@ function isAudioFile(file: File): boolean {
 
 export default function DropZone({
   userId,
+  projectId,
   onJobCreated,
 }: {
   userId: string
+  projectId: string | null
   onJobCreated: (job: Job) => void
 }) {
   const [dragging, setDragging] = useState(false)
@@ -84,6 +86,7 @@ export default function DropZone({
               file_size_bytes: file.size,
               status: 'pending',
               settings: {},
+              project_id: projectId,
             })
             .select()
             .single()
@@ -123,7 +126,7 @@ export default function DropZone({
         }
       }
     },
-    [userId, onJobCreated]
+    [userId, onJobCreated, projectId]
   )
 
   const onDrop = useCallback(

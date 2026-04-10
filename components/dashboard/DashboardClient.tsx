@@ -8,9 +8,10 @@ import JobList from './JobList'
 interface DashboardClientProps {
   userId: string
   initialJobs: Job[]
+  projectId?: string | null
 }
 
-export default function DashboardClient({ userId, initialJobs }: DashboardClientProps) {
+export default function DashboardClient({ userId, initialJobs, projectId = null }: DashboardClientProps) {
   const addJobRef = useRef<((job: Job) => void) | null>(null)
 
   const onRegisterAdd = useCallback((fn: (job: Job) => void) => {
@@ -29,7 +30,7 @@ export default function DashboardClient({ userId, initialJobs }: DashboardClient
           <div className="w-1 h-5 bg-[#00FF94] rounded-full" />
           <h2 className="text-white font-semibold text-lg">New Job</h2>
         </div>
-        <DropZone userId={userId} onJobCreated={onJobCreated} />
+        <DropZone userId={userId} projectId={projectId ?? null} onJobCreated={onJobCreated} />
       </section>
 
       {/* History section — JobList renders its own header */}
