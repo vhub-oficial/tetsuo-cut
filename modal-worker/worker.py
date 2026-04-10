@@ -53,7 +53,7 @@ MP3_FILTERS = (
     timeout=600,
     memory=1024,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def process_audio(item: dict) -> dict:
     """Web endpoint: receives {job_id} and processes the audio file."""
     from supabase import create_client
