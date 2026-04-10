@@ -22,6 +22,34 @@ function isAudioFile(file: File): boolean {
   return typeOk || extOk
 }
 
+// Fire-and-forget: trigger processing with one silent retry after 2s
+async function fireProcess(jobId: string): Promise<void> {
+  const body = JSON.stringify({ job_id: jobId })
+  let ok = false
+  try {
+    const res = await fetch('/api/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
+    ok = res.ok
+  } catch {
+    ok = false
+  }
+  if (!ok) {
+    await new Promise(r => setTimeout(r, 2000))
+    try {
+      await fetch('/api/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
+    } catch {
+      // silently ignore — cron fallback will handle it
+    }
+  }
+}
+
 export default function DropZone({
   userId,
   projectId,
@@ -47,103 +75,81 @@ export default function DropZone({
 
       const supabase = createClient()
 
-      for (const file of valid) {
-        const itemId = crypto.randomUUID()
-        setUploads((prev) => [
-          { file, id: itemId, status: 'uploading', progress: 0 },
-          ...prev,
-        ])
+      // All files upload in parallel — no more sequential blocking
+      await Promise.all(
+        valid.map(async (file) => {
+          const itemId = crypto.randomUUID()
+          setUploads((prev) => [
+            { file, id: itemId, status: 'uploading', progress: 0 },
+            ...prev,
+          ])
 
-        // Fake progress: increments ~1.5 per 100ms, caps at 80
-        const progressInterval = setInterval(() => {
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.id === itemId && u.status === 'uploading'
-                ? { ...u, progress: Math.min(u.progress + 1.5, 80) }
-                : u
+          // Fake progress: increments ~1.5 per 100ms, caps at 85
+          const progressInterval = setInterval(() => {
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === itemId && u.status === 'uploading'
+                  ? { ...u, progress: Math.min(u.progress + 1.5, 85) }
+                  : u
+              )
             )
-          )
-        }, 100)
+          }, 100)
 
-        try {
-          const ext = file.name.split('.').pop()!.toLowerCase()
-          const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`
-
-          // Upload to Supabase Storage
-          const { error: uploadError } = await supabase.storage
-            .from('audio-originals')
-            .upload(storagePath, file, { upsert: false })
-
-          if (uploadError) throw new Error(uploadError.message)
-
-          // Insert job record
-          const { data: job, error: insertError } = await supabase
-            .from('jobs')
-            .insert({
-              user_id: userId,
-              original_filename: file.name,
-              original_file_path: storagePath,
-              file_size_bytes: file.size,
-              status: 'pending',
-              settings: {},
-              project_id: projectId,
-            })
-            .select()
-            .single()
-
-          if (insertError || !job) throw new Error(insertError?.message ?? 'Failed to create job')
-
-          // Trigger processing with automatic retry (max 2 attempts, silent)
-          const processBody = JSON.stringify({ job_id: job.id })
-          let processOk = false
           try {
-            const processRes = await fetch('/api/process', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: processBody,
-            })
-            processOk = processRes.ok
-          } catch {
-            processOk = false
-          }
-          if (!processOk) {
-            await new Promise(r => setTimeout(r, 2000))
-            try {
-              await fetch('/api/process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: processBody,
+            const ext = file.name.split('.').pop()!.toLowerCase()
+            const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`
+
+            // Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+              .from('audio-originals')
+              .upload(storagePath, file, { upsert: false })
+
+            if (uploadError) throw new Error(uploadError.message)
+
+            // Insert job record
+            const { data: job, error: insertError } = await supabase
+              .from('jobs')
+              .insert({
+                user_id: userId,
+                original_filename: file.name,
+                original_file_path: storagePath,
+                file_size_bytes: file.size,
+                status: 'pending',
+                settings: {},
+                project_id: projectId,
               })
-            } catch {
-              // silently ignore — cron fallback will handle it
-            }
-          }
+              .select()
+              .single()
 
-          // Jump to 100% and notify parent
-          clearInterval(progressInterval)
-          setUploads((prev) =>
-            prev.map((u) => (u.id === itemId ? { ...u, progress: 100 } : u))
-          )
-          onJobCreated(job as Job)
+            if (insertError || !job) throw new Error(insertError?.message ?? 'Failed to create job')
 
-          // Remove upload card after a brief moment
-          setTimeout(() => {
-            setUploads((prev) => prev.filter((u) => u.id !== itemId))
-          }, 400)
-        } catch (err) {
-          clearInterval(progressInterval)
-          const message = err instanceof Error ? err.message : 'Upload failed'
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.id === itemId ? { ...u, status: 'error', progress: 0, error: message } : u
+            // Job is in DB — show it immediately, don't wait for Modal
+            clearInterval(progressInterval)
+            setUploads((prev) =>
+              prev.map((u) => (u.id === itemId ? { ...u, progress: 100 } : u))
             )
-          )
-          // Auto-clear error after 5s
-          setTimeout(() => {
-            setUploads((prev) => prev.filter((u) => u.id !== itemId))
-          }, 5000)
-        }
-      }
+            onJobCreated(job as Job)
+            setTimeout(() => {
+              setUploads((prev) => prev.filter((u) => u.id !== itemId))
+            }, 400)
+
+            // Trigger processing in the background — does NOT block the UX
+            void fireProcess(job.id)
+          } catch (err) {
+            clearInterval(progressInterval)
+            const message = err instanceof Error ? err.message : 'Upload failed'
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === itemId ? { ...u, status: 'error', progress: 0, error: message } : u
+              )
+            )
+            // Auto-clear error after 5s
+            setTimeout(() => {
+              setUploads((prev) => prev.filter((u) => u.id !== itemId))
+            }, 5000)
+          }
+        })
+      )
     },
     [userId, onJobCreated, projectId]
   )
