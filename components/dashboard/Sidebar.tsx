@@ -19,8 +19,8 @@ function SidebarLink({ href, label }: { href: string; label: string }) {
       href={href}
       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
         isActive
-          ? 'bg-[#1A1A1A] text-white'
-          : 'text-[#555] hover:text-white hover:bg-[#141414]'
+          ? 'bg-[#1A1A1A] text-white shadow-[inset_0_0_0_1px_rgba(0,255,148,0.15)]'
+          : 'text-[#888] hover:text-white hover:bg-[#141414]'
       }`}
     >
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -28,7 +28,7 @@ function SidebarLink({ href, label }: { href: string; label: string }) {
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth={1.5}
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
         />
       </svg>
       {label}
@@ -46,8 +46,8 @@ function SidebarProjectItem({ project, onDelete }: { project: Project; onDelete:
       href={href}
       className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
         isActive
-          ? 'bg-[#1A1A1A] text-white'
-          : 'text-[#555] hover:text-white hover:bg-[#141414]'
+          ? 'bg-[#1A1A1A] text-white shadow-[inset_0_0_0_1px_rgba(0,255,148,0.1)]'
+          : 'text-[#888] hover:text-white hover:bg-[#141414]'
       }`}
     >
       <span
@@ -61,7 +61,7 @@ function SidebarProjectItem({ project, onDelete }: { project: Project; onDelete:
           e.stopPropagation()
           onDelete(project.id)
         }}
-        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-[10px] leading-none cursor-pointer transition-opacity text-[#555] hover:text-red-400"
+        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-[10px] leading-none cursor-pointer transition-opacity text-[#666] hover:text-red-400 hover:drop-shadow-[0_0_4px_rgba(248,113,113,0.8)]"
       >
         ✕
       </span>
@@ -173,23 +173,23 @@ export default function Sidebar({
         <p className="text-[#444] text-[9px] tracking-widest uppercase mt-0.5">
           silence removed. precision kept.
         </p>
-        <p className="text-[#555] text-xs mt-3 truncate">{user.name}</p>
+        <p className="text-[#A0A0A0] text-xs mt-3 truncate">{user.name}</p>
       </div>
 
       {/* Navigation */}
       <nav className="p-3 space-y-1">
-        <SidebarLink href="/dashboard" label="All Files" />
+        <SidebarLink href="/dashboard" label="Overview" />
       </nav>
 
       {/* Projects section */}
       <div className="px-3">
         <div className="flex items-center justify-between py-2 px-2">
-          <span className="text-[#444] text-[10px] uppercase tracking-widest font-medium">
+          <span className="text-[#666] text-[10px] uppercase tracking-widest font-medium">
             Projects
           </span>
           <button
             onClick={() => setCreating(true)}
-            className="text-[#444] hover:text-[#00FF94] transition-colors text-lg leading-none"
+            className="text-[#666] hover:text-[#00FF94] hover:drop-shadow-[0_0_6px_rgba(0,255,148,0.8)] transition-colors text-lg leading-none"
           >
             +
           </button>
@@ -215,7 +215,7 @@ export default function Sidebar({
         <form action={logout}>
           <button
             type="submit"
-            className="w-full text-left text-xs text-[#444] hover:text-white transition-colors px-2 py-1"
+            className="w-full text-left text-xs text-[#666] hover:text-white transition-colors px-2 py-1"
           >
             Sign out
           </button>

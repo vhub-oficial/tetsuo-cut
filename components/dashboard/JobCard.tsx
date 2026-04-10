@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Job, JobStatus } from '@/lib/types'
 
+const STUCK_AFTER_SECS = 60
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -20,6 +22,11 @@ function formatDuration(seconds: number | null): string {
 function formatProcessingTime(start: string, end: string): string {
   const s = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000)
   return `Processed in ${s}s`
+}
+
+function formatElapsed(s: number): string {
+  if (s < 60) return `${s}s`
+  return `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
 function StatusBadge({ status }: { status: JobStatus }) {
@@ -68,7 +75,9 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
   const [downloading, setDownloading] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
+  const [elapsedSecs, setElapsedSecs] = useState(0)
 
+  // Poll for status updates while job is active
   useEffect(() => {
     if (job.status === 'done' || job.status === 'error') return
 
@@ -86,6 +95,27 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
     return () => clearInterval(interval)
   }, [job.status, job.id])
 
+  // Elapsed-time counter for pending/processing jobs
+  useEffect(() => {
+    if (job.status !== 'pending' && job.status !== 'processing') {
+      setElapsedSecs(0)
+      return
+    }
+    const since =
+      job.status === 'processing' && job.processing_started_at
+        ? new Date(job.processing_started_at).getTime()
+        : new Date(job.created_at).getTime()
+
+    const tick = () => setElapsedSecs(Math.floor((Date.now() - since) / 1000))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [job.status, job.created_at, job.processing_started_at])
+
+  const isStuck =
+    elapsedSecs >= STUCK_AFTER_SECS &&
+    (job.status === 'pending' || job.status === 'processing')
+
   async function handleDelete() {
     if (!window.confirm('Delete this job and its files?')) return
     await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' })
@@ -95,6 +125,7 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
   async function handleRetry() {
     setRetrying(true)
     setRetryError(null)
+    setElapsedSecs(0) // reset counter so stuck warning clears immediately
     try {
       const res = await fetch(`/api/reprocess/${job.id}`)
       const { error } = await res.json()
@@ -165,6 +196,22 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
         </div>
       )}
 
+      {/* Stuck warning */}
+      {isStuck && (
+        <div className="flex items-center justify-between bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2 mb-4">
+          <span className="text-amber-400 text-xs">
+            Taking longer than expected · {formatElapsed(elapsedSecs)}
+          </span>
+          <button
+            onClick={handleRetry}
+            disabled={retrying}
+            className="text-amber-400 hover:text-amber-300 text-xs font-medium ml-3 disabled:opacity-50 transition-colors"
+          >
+            {retrying ? 'Retrying…' : 'Retry now'}
+          </button>
+        </div>
+      )}
+
       {/* Error message */}
       {job.status === 'error' && (
         <p className="text-red-400 text-xs bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mb-4">
@@ -177,7 +224,7 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
         <div className="flex items-start gap-2">
           <button
             onClick={handleDelete}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-[#555] hover:text-red-400 mt-0.5"
+            className="opacity-0 group-hover:opacity-100 transition-all text-[#555] hover:text-red-400 hover:drop-shadow-[0_0_6px_rgba(248,113,113,0.8)] mt-0.5"
             title="Delete job"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,12 +233,17 @@ export default function JobCard({ initialJob, onDelete }: JobCardProps) {
             </svg>
           </button>
           <div>
-            <p className="text-[#555] text-xs">
+            <p className="text-[#666] text-xs">
               {new Date(job.created_at).toLocaleString()}
             </p>
             {job.status === 'done' && job.processing_started_at && job.processing_finished_at && (
-              <p className="text-[#555] text-xs mt-0.5">
+              <p className="text-[#666] text-xs mt-0.5">
                 {formatProcessingTime(job.processing_started_at, job.processing_finished_at)}
+              </p>
+            )}
+            {(job.status === 'pending' || job.status === 'processing') && !isStuck && (
+              <p className="text-[#444] text-xs mt-0.5 tabular-nums">
+                {job.status === 'processing' ? 'Processing' : 'Waiting'} · {formatElapsed(elapsedSecs)}
               </p>
             )}
           </div>

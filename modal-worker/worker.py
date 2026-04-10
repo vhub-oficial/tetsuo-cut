@@ -15,6 +15,12 @@ image = (
     .pip_install("fastapi[standard]", "supabase==2.10.0", "httpx==0.27.0")
 )
 
+# Lightweight image for the trigger endpoint — no ffmpeg, no supabase needed
+trigger_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install("fastapi[standard]")
+)
+
 WAV_FILTERS = (
     "highpass=f=80,"
     "acompressor=threshold=-20dB:ratio=4:makeup=6dB,"
@@ -40,21 +46,23 @@ MP3_FILTERS = (
     timeout=600,
     memory=1024,
 )
-@modal.fastapi_endpoint(method="POST")
-def process_audio(item: dict) -> dict:
+def process_job(job_id: str) -> None:
+    """Full audio processing — runs async via .spawn(), not as an HTTP endpoint."""
     from supabase import create_client
-
-    job_id = item.get("job_id")
-    if not job_id:
-        return {"error": "missing job_id"}
 
     supabase_url = os.environ["SUPABASE_URL"]
     service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     client = create_client(supabase_url, service_key)
 
-    client.table("jobs").update(
+    # Atomic claim: only proceed if still pending — prevents duplicate processing
+    # if both a direct trigger and the cron job fire for the same job.
+    claim = client.table("jobs").update(
         {"status": "processing", "processing_started_at": "now()"}
-    ).eq("id", job_id).execute()
+    ).eq("id", job_id).eq("status", "pending").execute()
+
+    if not claim.data:
+        # Job was already claimed by another trigger — nothing to do
+        return
 
     try:
         result = (
@@ -123,8 +131,6 @@ def process_audio(item: dict) -> dict:
             }
         ).eq("id", job_id).execute()
 
-        return {"ok": True, "job_id": job_id}
-
     except Exception as exc:
         error_message = str(exc)[:2000]
 
@@ -149,3 +155,15 @@ def process_audio(item: dict) -> dict:
             pass
 
         raise
+
+
+@app.function(image=trigger_image)
+@modal.fastapi_endpoint(method="POST")
+def process_audio(item: dict) -> dict:
+    """Lightweight HTTP trigger — spawns process_job async and returns immediately."""
+    job_id = item.get("job_id")
+    if not job_id:
+        return {"error": "missing job_id"}
+
+    process_job.spawn(job_id)
+    return {"ok": True}
