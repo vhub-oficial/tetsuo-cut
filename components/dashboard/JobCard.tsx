@@ -60,6 +60,8 @@ interface JobCardProps {
 export default function JobCard({ initialJob }: JobCardProps) {
   const [job, setJob] = useState<Job>(initialJob)
   const [downloading, setDownloading] = useState(false)
+  const [retrying, setRetrying] = useState(false)
+  const [retryError, setRetryError] = useState<string | null>(null)
 
   useEffect(() => {
     if (job.status === 'done' || job.status === 'error') return
@@ -77,6 +79,21 @@ export default function JobCard({ initialJob }: JobCardProps) {
 
     return () => clearInterval(interval)
   }, [job.status, job.id])
+
+  async function handleRetry() {
+    setRetrying(true)
+    setRetryError(null)
+    try {
+      const res = await fetch(`/api/reprocess/${job.id}`)
+      const { error } = await res.json()
+      if (error) throw new Error(error)
+      setJob((prev) => ({ ...prev, status: 'pending' }))
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : 'Retry failed')
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   async function handleDownload() {
     setDownloading(true)
@@ -168,6 +185,34 @@ export default function JobCard({ initialJob }: JobCardProps) {
             </svg>
             {downloading ? 'Preparing…' : 'Download'}
           </button>
+        )}
+
+        {job.status === 'error' && (
+          <div className="flex flex-col items-end gap-1.5">
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="flex items-center gap-2 bg-[#2A2A2A] border border-[#3A3A3A] text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-[#333] hover:border-[#484848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg
+                className={`w-3.5 h-3.5 ${retrying ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              {retrying ? 'Retrying…' : 'Retry'}
+            </button>
+            {retryError && (
+              <p className="text-red-400 text-xs">{retryError}</p>
+            )}
+          </div>
         )}
       </div>
     </div>
